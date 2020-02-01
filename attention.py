@@ -3,6 +3,7 @@ from tensorflow.keras.layers import Layer,InputSpec
 from tensorflow.keras import backend as K 
 from tensorflow.python.keras.utils import conv_utils
 from tensorflow.python.ops import array_ops
+import tensorflow as tf
 
 
 class Attn(Layer):
@@ -25,7 +26,12 @@ class Attn(Layer):
             if isinstance(mask,list):
                 mask = mask[0]
                 val *=K.cast(mask,K.floatx())
-                return val
+            # shape = K.shape(val)
+            # print(shape[0])
+            # pool_shape = tf.stack([shape[0],K.int_shape(val)[1]])
+            # print(pool_shape)
+            # print("Shape of val:",K.int_shape(K.reshape(val,shape=pool_shape)))
+            # val = K.reshape(val,shape=pool_shape)
         return val
     def compute_mask(self, hit, mask=None):
         # Also split the mask into 2 if it presents.

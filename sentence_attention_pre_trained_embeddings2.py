@@ -5,6 +5,7 @@ from attention import Attn,MyFlatten, MyReshape,NonMasking
 from gensim.test.utils import datapath, get_tmpfile
 from gensim.models import KeyedVectors
 from gensim.scripts.glove2word2vec import glove2word2vec
+import joblib
 
 def get_attn_layer(embedding_seq,num_cells=64, input_len=20):
     gru_layer_pre = tf.keras.layers.Bidirectional(tf.keras.layers.GRU(num_cells, return_sequences = True))(embedding_seq)
@@ -44,7 +45,7 @@ def get_model(vocab_size=1000,emb_dim = 100, embedding_matrix = None, input_len 
                                                 input_length = input_len,mask_zero=False)
     else:
         embedding_layer = tf.keras.layers.Embedding(vocab_size, embedding_matrix.shape[1], weights = [embedding_matrix],
-                                                input_length = input_len,mask_zero=False)
+                                                input_length = input_len,mask_zero=False,trainable=False)
     sequence_inputs_org = tf.keras.layers.Input(shape = (input_len[0],input_len[1]))
     print(tf.keras.backend.shape(sequence_inputs_org))
     sequence_inputs = tf.keras.layers.Lambda(lambda x: tf.unstack(x,axis=1))(sequence_inputs_org)
@@ -71,10 +72,33 @@ def get_model(vocab_size=1000,emb_dim = 100, embedding_matrix = None, input_len 
     model.compile(loss = 'sparse_categorical_crossentropy', optimizer = 'adam',metrics=['acc'])
 
     return model
+def load_glove_embedding(glove_path):
+    word2emb = {}
+    with open(glove_path, 'rb') as fglove:
+        for line in fglove:
+            cols = line.strip().split()
+            word = cols[0]
+            embedding = np.array(cols[1:], dtype='float32')
+            word2emb[word] = embedding
+    return word2emb
 
+def prepare_embedding_matrix(embedding, tokenizer, emb_dim=100):
+    matrix = np.zeros((len(tokenizer.word_index)+1,emb_dim))
+    count = 0
+    absent_words = []
+    for key in tokenizer.word_index:
+        if str.encode(key.replace("'", "").replace('"','')) in embedding.keys() :
+            matrix[tokenizer.word_index[key]] = embedding[str.encode(key.replace("'", "").replace('"',''))]
+        else:
+            count+=1
+            absent_words.append(key)
+    return matrix
 
 if __name__ == "__main__":
     #model = get_model()
-    model= get_model(vocab_size=10000,emb_dim = 100, input_len = (11,50), output_size = 8, num_cells = 64)
+    tokenizer = joblib.load("tokenizer.pkl")
+    embedding = load_glove_embedding("/data/glove.6B.100d.txt")
+    matrix = prepare_embedding_matrix(embedding,tokenizer)
+    model= get_model(vocab_size=len(tokenizer.word_index)+1,emb_dim = 100, embedding_matrix = matrix, input_len = (11,50), output_size = 8, num_cells = 64)
     print(model.summary())
     
